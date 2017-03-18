@@ -1794,7 +1794,7 @@ public class EmeraldRandomizerView extends FrameView {
         Random rand = new Random();
         boolean[] choices = new boolean[]{cbRandTrainerHeldItems.isSelected(),cbRandTrainerUseItems.isSelected(),
                                         cbNoTrainerLegends.isSelected(), cbBattleFrontier.isSelected()};
-        int[] itemList = ak.getUsableItems();
+        int[] itemList = ak.getBattleHeldItems(); // ak.getUsableItems();
         int[] battleItems = ak.getBattleUseItems();
         ArrayList<Integer> usedAt = new ArrayList<Integer>();
         ArrayList<Integer> fullEvo = ak.getArrayListInt(ak.getTrainersFullEvo());
@@ -1805,6 +1805,9 @@ public class EmeraldRandomizerView extends FrameView {
         int move = 0;
 
         if (rbTrainerUnchanged.isSelected()){
+            ArrayList<ArrayList<Integer>> possMoves = getPossibleTMTutorAttacks();
+            ArrayList<Integer> currMoves;
+            
             if (!choices[0] && !choices[1]){ //no item changes; we're done here
                 return;
             }
@@ -1825,7 +1828,36 @@ public class EmeraldRandomizerView extends FrameView {
                 
                 switch (dataType){
                     case 1:     //special moves ------------------------------------
-                        pkmnPtr += 16*numPkmn;
+                        //NEW CHANGE: if trainers are unchanged but we're changing items,
+                        //also change up the special move pool.
+                        if (!choices[0]){
+                            pkmnPtr += 16*numPkmn;
+                            break;
+                        }
+                        for (int i=0;i<numPkmn;i++,pkmnPtr += 16){
+                            //load pokemon
+                            pkmn = byteToInt(rom[pkmnPtr+5]) * 256 + byteToInt(rom[pkmnPtr+4]);
+                            //moves
+                            currMoves = possMoves.get(pkmn-1);
+                            for (int p=0;p<4;p++){
+                                move = byteToInt(rom[pkmnPtr+9+p*2]) * 256 + byteToInt(rom[pkmnPtr+8+p*2]);
+                                if (move > 0){
+                                    if (currMoves.size() <= 0){
+                                        rom[pkmnPtr+9+p*2] = intToByte(0);
+                                        rom[pkmnPtr+8+p*2] = intToByte(0);
+                                        continue;   //pokemon doesn't learn enough moves
+                                    }
+                                    move = currMoves.remove(rand.nextInt(currMoves.size()));
+                                    rom[pkmnPtr+9+p*2] = intToByte(move / 256);
+                                    rom[pkmnPtr+8+p*2] = intToByte(move % 256);
+                                    usedAt.add(move);
+                                }
+                            }
+                            //replace attack list
+                            while (usedAt.size() > 0){
+                                currMoves.add(usedAt.remove(0));
+                            }
+                        }
                         break;
                     case 2:     //item -------------------------------------------------------
                         for (int i=0;i<numPkmn;i++,pkmnPtr += 8){
@@ -1844,6 +1876,29 @@ public class EmeraldRandomizerView extends FrameView {
                                 item = itemList[rand.nextInt(itemList.length)];
                                 rom[pkmnPtr+7] = intToByte(item / 256);
                                 rom[pkmnPtr+6] = intToByte(item % 256);
+                                
+                                //load pokemon
+                                pkmn = byteToInt(rom[pkmnPtr+5]) * 256 + byteToInt(rom[pkmnPtr+4]);
+                                //moves
+                                currMoves = possMoves.get(pkmn-1);
+                                for (int p=0;p<4;p++){
+                                    move = byteToInt(rom[pkmnPtr+9+p*2]) * 256 + byteToInt(rom[pkmnPtr+8+p*2]);
+                                    if (move > 0){
+                                        if (currMoves.size() <= 0){
+                                            rom[pkmnPtr+9+p*2] = intToByte(0);
+                                            rom[pkmnPtr+8+p*2] = intToByte(0);
+                                            continue;   //pokemon doesn't learn enough moves
+                                        }
+                                        move = currMoves.remove(rand.nextInt(currMoves.size()));
+                                        rom[pkmnPtr+9+p*2] = intToByte(move / 256);
+                                        rom[pkmnPtr+8+p*2] = intToByte(move % 256);
+                                        usedAt.add(move);
+                                    }
+                                }
+                                //replace attack list
+                                while (usedAt.size() > 0){
+                                    currMoves.add(usedAt.remove(0));
+                                }
                             }
                         }
                         break;
